@@ -633,6 +633,11 @@ impl ChatState {
         None
     }
 
+    pub fn composer_clear(&mut self) {
+        self.composer.clear();
+        self.composer_cursor = 0;
+        self.invalidate_composer_layout();
+    }
     pub fn composer_backspace(&mut self) {
         if self.composer_cursor == 0 {
             return;
@@ -1262,6 +1267,7 @@ fn chat_help_lines() -> Vec<String> {
         "  Backspace          delete char",
         "  Ctrl+Backspace     delete word left",
         "  Ctrl+Delete        delete word right",
+        "  Ctrl+U             clear composer",
         "  Ctrl+← / Ctrl+→    move cursor by word",
         "  @user              mention (Tab/Enter to confirm)",
         "",
