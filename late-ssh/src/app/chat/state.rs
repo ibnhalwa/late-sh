@@ -70,6 +70,7 @@ pub struct ChatState {
     overlay: Option<Overlay>,
     pub(crate) unread_counts: HashMap<Uuid, i64>,
     pending_read_rooms: HashSet<Uuid>,
+    primed_room_ids: HashSet<Uuid>,
     room_tx: watch::Sender<Option<Uuid>>,
     pub(crate) selected_room_id: Option<Uuid>,
     pub(crate) room_jump_active: bool,
@@ -147,6 +148,7 @@ impl ChatState {
             overlay: None,
             unread_counts: HashMap::new(),
             pending_read_rooms: HashSet::new(),
+            primed_room_ids: HashSet::new(),
             room_tx,
             selected_room_id: None,
             room_jump_active: false,
@@ -230,6 +232,23 @@ impl ChatState {
         self.pending_read_rooms.insert(room_id);
         self.unread_counts.insert(room_id, 0);
         self.service.mark_room_read_task(self.user_id, room_id);
+    }
+
+    /// Warm a room's history exactly once per session when some other UI
+    /// surface (the dashboard card) wants to render it without making it
+    /// the chat page's selected room.
+    pub fn prime_room_if_empty(&mut self, room_id: Uuid) {
+        let Some((_, messages)) = self.rooms.iter().find(|(room, _)| room.id == room_id) else {
+            return;
+        };
+        if !messages.is_empty() {
+            self.primed_room_ids.insert(room_id);
+            return;
+        }
+        if !self.primed_room_ids.insert(room_id) {
+            return;
+        }
+        self.service.list_chats_task(self.user_id, Some(room_id));
     }
 
     /// Returns visible messages for the given room.
@@ -477,7 +496,7 @@ impl ChatState {
             .iter()
             .map(|(room, _)| {
                 let label = if room.kind == "dm" {
-                    format!("@{}", self.dm_display_name(room))
+                    self.dm_display_name(room)
                 } else if let Some(slug) = room.slug.as_deref().filter(|s| !s.is_empty()) {
                     format!("#{slug}")
                 } else if let Some(code) = room.language_code.as_deref() {

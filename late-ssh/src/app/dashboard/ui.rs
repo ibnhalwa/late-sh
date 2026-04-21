@@ -112,6 +112,13 @@ fn draw_favorites_strip(frame: &mut Frame, area: Rect, pins: &[(uuid::Uuid, Stri
         if idx > 0 {
             spans.push(Span::raw(" "));
         }
+        // Slot hint doubles as the `g<digit>` target; only 1..9 are reachable
+        // via the prefix, so pins beyond nine render without a number.
+        let slot = if idx < 9 {
+            format!("{}:", idx + 1)
+        } else {
+            String::new()
+        };
         let style = if *active {
             Style::default()
                 .fg(theme::AMBER_GLOW())
@@ -120,7 +127,7 @@ fn draw_favorites_strip(frame: &mut Frame, area: Rect, pins: &[(uuid::Uuid, Stri
         } else {
             Style::default().fg(theme::TEXT_DIM())
         };
-        spans.push(Span::styled(format!(" {label} "), style));
+        spans.push(Span::styled(format!(" {slot}{label} "), style));
     }
     spans.push(Span::styled(
         "   [] cycle · , last · g_ jump",

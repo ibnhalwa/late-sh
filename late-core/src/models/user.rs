@@ -171,6 +171,11 @@ impl User {
         Ok(extract_ignored_user_ids(&settings))
     }
 
+    pub async fn favorite_room_ids(client: &Client, user_id: Uuid) -> Result<Vec<Uuid>> {
+        let settings = Self::settings_for_user(client, user_id).await?;
+        Ok(extract_favorite_room_ids(&settings))
+    }
+
     pub async fn theme_id(client: &Client, user_id: Uuid) -> Result<Option<String>> {
         let settings = Self::settings_for_user(client, user_id).await?;
         Ok(extract_theme_id(&settings))
