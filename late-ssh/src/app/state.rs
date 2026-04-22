@@ -285,6 +285,23 @@ impl App {
         }
     }
 
+    fn current_visible_chat_room_id(&self) -> Option<Uuid> {
+        match self.screen {
+            Screen::Dashboard => self.dashboard_active_room_id(),
+            Screen::Chat => self.chat.selected_room_id,
+            _ => None,
+        }
+    }
+
+    pub(crate) fn sync_visible_chat_room(&mut self) {
+        let visible_room_id = self.current_visible_chat_room_id();
+        let changed = self.chat.visible_room_id() != visible_room_id;
+        self.chat.set_visible_room_id(visible_room_id);
+        if changed && let Some(room_id) = visible_room_id {
+            self.chat.mark_room_read(room_id);
+        }
+    }
+
     /// Pins to render in the dashboard quick-switch strip. `None` when fewer
     /// than two favorites are pinned — there's nothing to switch between, so
     /// the strip is hidden entirely.
@@ -528,7 +545,7 @@ impl App {
             settings_modal::ui::MODAL_WIDTH,
         );
 
-        Ok(Self {
+        let mut app = Self {
             running: true,
             size: (cols, rows),
             screen: Screen::Dashboard,
@@ -607,7 +624,9 @@ impl App {
             icon_picker_state: super::icon_picker::IconPickerState::default(),
             icon_catalog: None,
             last_terminal_bg: None,
-        })
+        };
+        app.sync_visible_chat_room();
+        Ok(app)
     }
 
     pub fn resize(&mut self, cols: u16, rows: u16) -> Result<(), io::Error> {

@@ -544,8 +544,8 @@ fn handle_parsed_input(app: &mut App, event: ParsedInput) {
             if app.screen == Screen::Chat {
                 app.chat.request_list();
                 app.chat.sync_selection();
-                app.chat.mark_selected_room_read();
             }
+            app.sync_visible_chat_room();
             app.chat.clear_message_selection();
         }
         // Page keys mirror Ctrl-U / Ctrl-D. Signs follow the existing scheme:
@@ -1079,19 +1079,21 @@ fn handle_global_key(app: &mut App, ctx: InputContext, byte: u8) -> bool {
         b'1' => {
             reset_composers_for_page_change(app);
             app.screen = Screen::Dashboard;
+            app.sync_visible_chat_room();
             true
         }
         b'2' => {
             reset_composers_for_page_change(app);
             app.chat.request_list();
             app.chat.sync_selection();
-            app.chat.mark_selected_room_read();
             app.screen = Screen::Chat;
+            app.sync_visible_chat_room();
             true
         }
         b'3' => {
             reset_composers_for_page_change(app);
             app.screen = Screen::Games;
+            app.sync_visible_chat_room();
             true
         }
         b'\t' => {
@@ -1102,10 +1104,10 @@ fn handle_global_key(app: &mut App, ctx: InputContext, byte: u8) -> bool {
                 Screen::Chat => {
                     app.chat.request_list();
                     app.chat.sync_selection();
-                    app.chat.mark_selected_room_read();
                 }
                 Screen::Games => {}
             }
+            app.sync_visible_chat_room();
             true
         }
         b'P' => {
