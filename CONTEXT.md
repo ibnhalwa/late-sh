@@ -519,6 +519,7 @@ The artboard is keyboard-first, but it is not "just type into a grid". It layers
 
 - `view` mode: inspect the board, move the cursor/viewport, and keep global page switching (`1-4`, `Tab`, `Shift+Tab`) available.
 - `active` mode: edit the board. Single-key global shortcuts are suppressed so typing goes to the canvas/editor.
+- `snapshot` view: read-only historical daily/monthly archive view. `g` in Artboard view mode opens the snapshot browser; `j/k` or arrows move, `Enter` selects, the top row returns to the live board, and `g` exits an active historical snapshot back to live.
 
 ```text
 type chars -> draw directly
@@ -533,6 +534,7 @@ Key behaviors:
 - Artboard opens in `view` mode.
 - In `view` mode, arrows/Home/End/PageUp/PageDown move around the board without entering draw mode.
 - `i` or `Enter` enters `active` mode.
+- `g` in `view` mode opens daily/monthly snapshots; selected archives cannot enter `active` mode.
 - Plain typing draws directly at the cursor.
 - Typing space erases at the cursor.
 - `Shift+arrows` starts/extends a selection.
@@ -562,6 +564,7 @@ Mouse-specific extras:
 | Open Artboard | `4`, `Tab`, `Shift+Tab` | Dedicated top-level screen; entering it also connects a local client |
 | Move around in view mode | `←↑↓→`, `Home`, `End`, `PgUp`, `PgDn`, mouse wheel | Lets users inspect/pan without entering draw mode |
 | Enter active mode | `i`, `Enter` | Switches the screen from inspect to edit |
+| Snapshot browser | `g` | View daily/monthly archives read-only; `j/k` or arrows navigate, `Enter` selects, top row returns live |
 | Draw / erase in active mode | `<type>`, `Space`, `Backspace`, `Delete` | Plain typing edits the shared canvas |
 | Select | `Shift+arrows`, mouse drag | Local selection only |
 | Copy / cut to swatch | `Ctrl+C`, `Ctrl+X` | Fills swatch strip; does not sync to peers |
@@ -906,6 +909,7 @@ Currently the SSH app assumes a single process. These in-memory structures would
 - Chat room visibility enforced via `ChatRoom::list_for_user` (membership join) - never expose rooms user hasn't joined
 - `#announcements` is read-joinable like other permanent public rooms, but only admins may post there; enforce this in the chat service send path, not only in the UI
 - DM rooms canonicalize user IDs (`dm_user_a < dm_user_b` text order) to prevent duplicate DM pairs
+- DM room endpoints (`dm_user_a`, `dm_user_b`) are durable even when `chat_room_members` changes: if one participant leaves a DM, the next message from the other participant re-adds both endpoints before targeted delivery. Private topic rooms do not have durable endpoints and still require explicit invites/rejoins.
 - `users.username` is the canonical public handle for chat/DM lookup; SSH login seeds it from the SSH username via `User::next_available_username` (sanitizes to `[A-Za-z0-9._-]`, adds `-N` suffixes to stay unique on `LOWER(username)`)
 - @bot and @graybeard bootstrap on app startup: ensure DB user with a fixed `username`, join public rooms, and insert into `active_users` (always online). Both are dedicated users with fixed fingerprints (`bot-fp-000`, `graybeard-fp-000`)
 - Connection limits (global semaphore + per-IP counter) plus SSH attempt rate limit (sliding window) MUST be enforced before any auth (effective client IP is resolved from PROXY protocol when enabled)
@@ -1280,7 +1284,7 @@ Toast notification is hidden by default (0 rows). When active, it appears as a 3
 | `?` | Global (not composing) | Open help modal (multi-slide guide). Also works inside the settings modal, which renders help on top while keeping the draft intact. |
 | `h` / `l` / `←` / `→` | Help modal | Switch slides (Overview / Chat / Music / News / Arcade / Bonsai / Settings / Architecture) |
 | `j` / `k` / `↑` / `↓` | Help modal | Scroll current slide (uncapped — past the last line is blank space) |
-| `?` / `q` / `Esc` | Help modal | Close (returns to the underlying screen, including the settings modal if it was open) |
+| `Esc` / `q` / `?` | Help modal | Close (returns to the underlying screen, including the settings modal if it was open) |
 | `Tab` | Global | Cycle screens |
 | `1` | Global | Jump to Dashboard |
 | `2` | Global | Jump to Chat |
@@ -1344,7 +1348,7 @@ Toast notification is hidden by default (0 rows). When active, it appears as a 3
 | `/ignore [@user]` | Chat composer | Mute a user, or list muted users when no arg |
 | `/unignore [@user]` | Chat composer | Remove a user from your ignore list |
 | `j` / `k` / arrows | Chat overlay (`/help`, ignore list) | Scroll overlay |
-| `q` / `Esc` | Chat overlay (`/help`, ignore list) | Close overlay |
+| `Esc` / `q` | Chat overlay (`/help`, ignore list) | Close overlay |
 | `Ctrl+O` | Global | Open the settings modal from anywhere |
 | `↑` / `↓` / `j` / `k` | Settings modal | Move between rows (Username, Theme, Background, Right sidebar, Games sidebar, Country, Timezone, DMs, @mentions, Game events, Bell, Cooldown, Format) |
 | `←` / `→` | Settings modal | Cycle the current row's setting (theme, toggles, cooldown, notification format) |
@@ -1352,7 +1356,7 @@ Toast notification is hidden by default (0 rows). When active, it appears as a 3
 | `Alt+Enter` | Settings modal (bio editing) | Insert newline |
 | `?` | Settings modal | Open help modal on top |
 | `j` / `k` / `↑` / `↓` | Read-only profile modal | Scroll |
-| `q` / `Esc` | Read-only profile modal | Close |
+| `Esc` / `q` | Read-only profile modal | Close |
 | `Esc` | Any modal | Close/cancel |
 | `c` | Chat (not composing) | Open web chat QR (copies URL + shows it as fallback) |
 | `Ctrl+]` | Dashboard / Chat | Open icon picker (emoji + nerd font). Auto-starts the composer if not already composing. Inserts into the chat composer only. |
