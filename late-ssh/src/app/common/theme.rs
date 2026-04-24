@@ -130,7 +130,7 @@ pub const OPTIONS: &[ThemeOption] = &[
         kind: ThemeKind::TokyoNight,
         id: "tokyonight",
         label: "Tokyo Night",
-    },    
+    },
     ThemeOption {
         kind: ThemeKind::Kanagawa,
         id: "kanagawa",
@@ -555,9 +555,9 @@ const PALETTE_TOKYO_NIGHT: Palette = Palette {
     amber_glow: Color::Rgb(224, 175, 104),
     chat_body: Color::Rgb(192, 202, 245),
     chat_author: Color::Rgb(42, 195, 222), // Cyan
-    mention: Color::Rgb(255, 158, 100), // Orange
-    success: Color::Rgb(158, 206, 106), // Green
-    error: Color::Rgb(247, 118, 142), // Red
+    mention: Color::Rgb(255, 158, 100),    // Orange
+    success: Color::Rgb(158, 206, 106),    // Green
+    error: Color::Rgb(247, 118, 142),      // Red
     bot: Color::Rgb(122, 162, 247),
     bonsai_sprout: Color::Rgb(115, 218, 202),
     bonsai_leaf: Color::Rgb(158, 206, 106),
@@ -578,14 +578,14 @@ const PALETTE_KANAGAWA: Palette = Palette {
     text_faint: Color::Rgb(114, 113, 133),
     text_dim: Color::Rgb(156, 156, 156),
     text_muted: Color::Rgb(210, 201, 166),
-    text: Color::Rgb(210, 201, 166), // Fuji White
+    text: Color::Rgb(210, 201, 166),       // Fuji White
     text_bright: Color::Rgb(230, 180, 80), // Autumn Yellow
-    amber: Color::Rgb(255, 160, 102), // Surimi Orange
+    amber: Color::Rgb(255, 160, 102),      // Surimi Orange
     amber_dim: Color::Rgb(196, 112, 60),
     amber_glow: Color::Rgb(255, 160, 102),
     chat_body: Color::Rgb(210, 201, 166),
     chat_author: Color::Rgb(152, 187, 108), // Spring Green
-    mention: Color::Rgb(149, 123, 171), // Oni Violet
+    mention: Color::Rgb(149, 123, 171),     // Oni Violet
     success: Color::Rgb(152, 187, 108),
     error: Color::Rgb(196, 114, 114),
     bot: Color::Rgb(126, 150, 189),
@@ -610,14 +610,14 @@ const PALETTE_DRACULA: Palette = Palette {
     text_muted: Color::Rgb(248, 248, 242),
     text: Color::Rgb(248, 248, 242),
     text_bright: Color::Rgb(255, 121, 198), // Pink highlight
-    amber: Color::Rgb(241, 250, 140), // Yellow
+    amber: Color::Rgb(241, 250, 140),       // Yellow
     amber_dim: Color::Rgb(191, 200, 90),
     amber_glow: Color::Rgb(241, 250, 140),
     chat_body: Color::Rgb(248, 248, 242),
     chat_author: Color::Rgb(139, 233, 253), // Cyan
-    mention: Color::Rgb(255, 184, 108), // Orange
-    success: Color::Rgb(80, 250, 123), // Green
-    error: Color::Rgb(255, 85, 85), // Red
+    mention: Color::Rgb(255, 184, 108),     // Orange
+    success: Color::Rgb(80, 250, 123),      // Green
+    error: Color::Rgb(255, 85, 85),         // Red
     bot: Color::Rgb(189, 147, 249),
     bonsai_sprout: Color::Rgb(139, 233, 253),
     bonsai_leaf: Color::Rgb(80, 250, 123),
@@ -640,7 +640,7 @@ const PALETTE_OXOCARBON: Palette = Palette {
     text_muted: Color::Rgb(242, 244, 248),
     text: Color::Rgb(242, 244, 248),
     text_bright: Color::Rgb(255, 126, 182), // Neon Pink contrast
-    amber: Color::Rgb(190, 149, 255), // Purple
+    amber: Color::Rgb(190, 149, 255),       // Purple
     amber_dim: Color::Rgb(140, 99, 205),
     amber_glow: Color::Rgb(190, 149, 255),
     chat_body: Color::Rgb(242, 244, 248),
