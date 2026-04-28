@@ -102,6 +102,36 @@ resource "helm_release" "vmagent" {
         "remoteWrite.label" = "origin_prometheus=rke2"
       }
 
+      extraScrapeConfigs = [
+        {
+          job_name        = "kube-state-metrics"
+          honor_labels    = true
+          scrape_interval = "30s"
+
+          kubernetes_sd_configs = [
+            {
+              role = "endpoints"
+              namespaces = {
+                names = ["monitoring"]
+              }
+            }
+          ]
+
+          relabel_configs = [
+            {
+              source_labels = ["__meta_kubernetes_service_name"]
+              regex         = "kube-state-metrics"
+              action        = "keep"
+            },
+            {
+              source_labels = ["__meta_kubernetes_endpoint_port_name"]
+              regex         = "http"
+              action        = "keep"
+            }
+          ]
+        }
+      ]
+
       resources = {
         limits = {
           cpu    = "250m"
@@ -131,7 +161,7 @@ resource "helm_release" "kube_state_metrics" {
     yamlencode({
       fullnameOverride = "kube-state-metrics"
 
-      prometheusScrape = true
+      prometheusScrape = false
 
       resources = {
         limits = {
