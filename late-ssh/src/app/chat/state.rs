@@ -8,7 +8,7 @@ use late_core::{
     },
 };
 use ratatui_textarea::{CursorMove, Input, TextArea, WrapMode};
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use uuid::Uuid;
 
 use crate::app::common::overlay::Overlay;
@@ -73,6 +73,8 @@ pub struct ChatState {
     pending_read_rooms: HashSet<Uuid>,
     visible_room_id: Option<Uuid>,
     room_tx: watch::Sender<Option<Uuid>>,
+    refresh_tx: mpsc::UnboundedSender<()>,
+    refresh_room_id: Option<Uuid>,
     pub(crate) selected_room_id: Option<Uuid>,
     pub(crate) room_jump_active: bool,
     composer: TextArea<'static>,
@@ -133,10 +135,9 @@ impl ChatState {
         article_service: news::svc::ArticleService,
         showcase_service: showcase::svc::ShowcaseService,
     ) -> Self {
-        let snapshot_rx = service.subscribe_state();
         let event_rx = service.subscribe_events();
         let (room_tx, room_rx) = watch::channel(None);
-        let bg_task = service.start_user_refresh_task(user_id, room_rx);
+        let (snapshot_rx, refresh_tx, bg_task) = service.start_user_refresh_task(user_id, room_rx);
 
         Self {
             service,
@@ -155,6 +156,8 @@ impl ChatState {
             pending_read_rooms: HashSet::new(),
             visible_room_id: None,
             room_tx,
+            refresh_tx,
+            refresh_room_id: None,
             selected_room_id: None,
             room_jump_active: false,
             composer: new_chat_textarea(),
@@ -217,9 +220,16 @@ impl ChatState {
         composer::set_themed_textarea_cursor_visible(&mut self.composer, true);
     }
 
-    pub fn request_list(&self) {
-        self.service
-            .list_chats_task(self.user_id, self.selected_room_id);
+    pub fn request_list(&mut self) {
+        self.sync_refresh_room_id();
+        let _ = self.refresh_tx.send(());
+    }
+
+    fn sync_refresh_room_id(&mut self) {
+        if self.refresh_room_id != self.selected_room_id {
+            self.refresh_room_id = self.selected_room_id;
+            let _ = self.room_tx.send(self.selected_room_id);
+        }
     }
 
     pub fn sync_selection(&mut self) {
@@ -1020,7 +1030,7 @@ impl ChatState {
     }
 
     pub fn tick(&mut self) -> Option<Banner> {
-        let _ = self.room_tx.send(self.selected_room_id);
+        self.sync_refresh_room_id();
         self.drain_snapshot();
         let banner = self.drain_events();
         let news_banner = self.news.tick();
