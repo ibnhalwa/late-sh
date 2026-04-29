@@ -149,7 +149,10 @@ fn draw_late_fetch_strip(frame: &mut Frame, area: Rect, state: &ProfileModalStat
         )
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme::BORDER()));
-    let inner = block.inner(area);
+    let inner = block.inner(area).inner(Margin {
+        horizontal: 1,
+        vertical: 0,
+    });
     frame.render_widget(block, area);
 
     let Some(profile) = state.profile() else {
@@ -160,7 +163,7 @@ fn draw_late_fetch_strip(frame: &mut Frame, area: Rect, state: &ProfileModalStat
     let label = Style::default().fg(theme::AMBER_DIM());
     let value = Style::default().fg(theme::TEXT());
 
-    let theme_id = profile.theme_id.as_deref().unwrap_or("late");
+    let theme_id = profile.theme_id.as_deref().unwrap_or(theme::DEFAULT_ID);
     let created = profile
         .created_at
         .as_ref()

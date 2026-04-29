@@ -25,11 +25,64 @@ async fn make_app_harness() -> (late_core::test_utils::TestDb, late_ssh::app::st
 }
 
 #[tokio::test]
-async fn enter_on_dashboard_shows_url_copied_banner() {
+async fn uppercase_b_on_dashboard_opens_cli_install_modal() {
     let (_test_db, mut app) = make_app_harness().await;
 
-    app.handle_input(b"\n");
-    wait_for_render_contains(&mut app, "CLI install command copied!").await;
+    app.handle_input(b"b");
+    assert!(
+        !render_plain(&mut app).contains("build from source"),
+        "lowercase b should not open the CLI install modal"
+    );
+
+    app.handle_input(b"B");
+    wait_for_render_contains(&mut app, "build from source").await;
+    wait_for_render_contains(&mut app, "curl -fsSL https://cli.late.sh/install.sh | bash").await;
+}
+
+#[tokio::test]
+async fn mouse_move_does_not_close_cli_install_modal() {
+    let (_test_db, mut app) = make_app_harness().await;
+
+    app.handle_input(b"B");
+    wait_for_render_contains(&mut app, "build from source").await;
+
+    app.handle_input(b"\x1b[<35;20;5M");
+    wait_for_render_contains(&mut app, "build from source").await;
+
+    app.handle_input(b"x");
+    assert!(!render_plain(&mut app).contains("build from source"));
+}
+
+#[tokio::test]
+async fn uppercase_p_only_opens_pairing_qr_on_dashboard() {
+    let (_test_db, mut app) = make_app_harness().await;
+
+    app.handle_input(b"2");
+    wait_for_render_contains(&mut app, " Chat ").await;
+    app.handle_input(b"P");
+    assert!(
+        !render_plain(&mut app).contains("Scan to pair audio"),
+        "uppercase P should not open the pairing QR outside Dashboard"
+    );
+
+    app.handle_input(b"1");
+    wait_for_render_contains(&mut app, " Dashboard ").await;
+    app.handle_input(b"P");
+    wait_for_render_contains(&mut app, "Scan to pair audio").await;
+}
+
+#[tokio::test]
+async fn mouse_move_does_not_close_pairing_qr() {
+    let (_test_db, mut app) = make_app_harness().await;
+
+    app.handle_input(b"P");
+    wait_for_render_contains(&mut app, "Scan to pair audio").await;
+
+    app.handle_input(b"\x1b[<35;20;5M");
+    wait_for_render_contains(&mut app, "Scan to pair audio").await;
+
+    app.handle_input(b"x");
+    assert!(!render_plain(&mut app).contains("Scan to pair audio"));
 }
 
 #[tokio::test]
