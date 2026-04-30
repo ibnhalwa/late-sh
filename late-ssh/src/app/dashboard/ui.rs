@@ -120,7 +120,9 @@ pub fn draw_dashboard(frame: &mut Frame, area: Rect, view: DashboardRenderInput<
 
 fn draw_blackjack_and_chat_section(frame: &mut Frame, area: Rect, view: DashboardRenderInput<'_>) {
     let rooms = dashboard_blackjack_rooms(view.rooms_snapshot);
-    if view.show_room_showcases && let Some(grid_height) = blackjack_grid_height(area) {
+    if view.show_room_showcases
+        && let Some(grid_height) = blackjack_grid_height(area)
+    {
         let split =
             Layout::vertical([Constraint::Length(grid_height), Constraint::Fill(1)]).split(area);
         draw_blackjack_grid(
