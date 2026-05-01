@@ -54,6 +54,13 @@ pub(crate) const GAME_SELECTION_NONOGRAMS: usize = 3;
 pub(crate) const GAME_SELECTION_MINESWEEPER: usize = 4;
 pub(crate) const GAME_SELECTION_SOLITAIRE: usize = 5;
 pub(crate) const DEFAULT_GAME_SELECTION: usize = GAME_SELECTION_2048;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DashboardGameToggleTarget {
+    Arcade,
+    Room,
+}
+
 impl NotificationMode {
     /// Map the `notify_format` profile field to a concrete mode. Unknown
     /// or missing values fall back to `Both`, matching the on-read
@@ -255,6 +262,7 @@ pub struct App {
     /// Games Hub
     pub(crate) game_selection: usize,
     pub(crate) is_playing_game: bool,
+    pub(crate) dashboard_game_toggle_target: Option<DashboardGameToggleTarget>,
     pub(crate) rooms_service: crate::app::rooms::svc::RoomsService,
     pub(crate) blackjack_table_manager:
         crate::app::rooms::blackjack::manager::BlackjackTableManager,
@@ -719,6 +727,7 @@ impl App {
             bonsai_care_state,
             game_selection: DEFAULT_GAME_SELECTION,
             is_playing_game: false,
+            dashboard_game_toggle_target: None,
             rooms_service: config.rooms_service,
             blackjack_table_manager: config.blackjack_table_manager,
             rooms_selected_index: 0,
