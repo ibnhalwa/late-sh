@@ -133,7 +133,7 @@ Reactions:
 Notifications:
 - Mentions are stored in `notifications`.
 - Mention unread state is cursor-based through `mention_feed_reads`.
-- Mention resolution excludes the actor; DMs only notify DM participants, private rooms only members, and public rooms may mention any user.
+- Mention resolution excludes the actor; DMs only notify DM participants, private rooms only members, and non-game public rooms may mention any user. Game-room chat does not create Mentions feed notifications.
 
 ---
 

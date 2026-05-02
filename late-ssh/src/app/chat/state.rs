@@ -77,7 +77,11 @@ pub(crate) enum RoomSlot {
 }
 
 pub(super) fn is_chat_list_room(room: &ChatRoom) -> bool {
-    room.kind != "game"
+    if room.kind == "game" {
+        return false;
+    }
+
+    room.kind == "dm" || room.permanent || matches!(room.visibility.as_str(), "public" | "private")
 }
 
 pub struct ChatState {
