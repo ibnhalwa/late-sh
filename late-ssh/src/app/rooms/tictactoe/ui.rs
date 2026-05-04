@@ -88,10 +88,7 @@ fn draw_board(frame: &mut Frame, area: Rect, state: &State) {
                 let glyph_text = glyph_row(mark, cell_w, cell_h, cell_row);
                 spans.push(Span::styled(glyph_text, cell_style(selected, mark)));
                 if col < 2 {
-                    spans.push(Span::styled(
-                        "│",
-                        Style::default().fg(theme::BORDER_DIM()),
-                    ));
+                    spans.push(Span::styled("│", Style::default().fg(theme::BORDER_DIM())));
                 }
             }
             lines.push(Line::from(spans));
@@ -201,10 +198,7 @@ fn draw_side(frame: &mut Frame, area: Rect, state: &State, usernames: &HashMap<U
 fn hint_line(key: &str, label: &str) -> Line<'static> {
     Line::from(vec![
         Span::styled(key.to_string(), Style::default().fg(theme::AMBER_DIM())),
-        Span::styled(
-            format!("  {label}"),
-            Style::default().fg(theme::TEXT_DIM()),
-        ),
+        Span::styled(format!("  {label}"), Style::default().fg(theme::TEXT_DIM())),
     ])
 }
 

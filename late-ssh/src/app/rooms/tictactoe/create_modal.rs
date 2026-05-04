@@ -13,8 +13,9 @@ use crate::app::{
 };
 
 const DISPLAY_NAME_MAX_LEN: usize = 48;
-const MODAL_WIDTH: u16 = 56;
-const MODAL_HEIGHT: u16 = 9;
+const MODAL_WIDTH: u16 = 60;
+const MODAL_HEIGHT: u16 = 12;
+const LABEL_WIDTH: usize = 10;
 
 pub struct TicTacToeCreateModal {
     display_name: String,
@@ -61,7 +62,7 @@ impl CreateRoomModal for TicTacToeCreateModal {
         frame.render_widget(Clear, modal_area);
 
         let block = Block::default()
-            .title(" Tic-Tac-Toe Room ")
+            .title(" New Tic-Tac-Toe Room ")
             .title_style(
                 Style::default()
                     .fg(theme::AMBER_GLOW())
@@ -73,31 +74,38 @@ impl CreateRoomModal for TicTacToeCreateModal {
         frame.render_widget(block, modal_area);
 
         let layout = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(1),
+            Constraint::Length(1), // breathing
+            Constraint::Length(1), // heading
+            Constraint::Length(1), // breathing
+            Constraint::Length(1), // name row
+            Constraint::Min(0),    // flex
+            Constraint::Length(1), // footer
         ])
         .split(inner);
 
+        let width = inner.width as usize;
         frame.render_widget(Paragraph::new(section_heading("Table")), layout[1]);
         frame.render_widget(
-            Paragraph::new(name_row(&self.display_name, inner.width as usize)),
-            layout[2],
+            Paragraph::new(field_row(
+                true,
+                "Name",
+                name_value_span(&self.display_name),
+                width,
+            )),
+            layout[3],
         );
 
         let footer = self
             .error
             .as_ref()
             .map(|message| {
-                Line::from(Span::styled(
-                    message.clone(),
-                    Style::default().fg(theme::ERROR()),
-                ))
+                Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(message.clone(), Style::default().fg(theme::ERROR())),
+                ])
             })
             .unwrap_or_else(footer_line);
-        frame.render_widget(Paragraph::new(footer), layout[4]);
+        frame.render_widget(Paragraph::new(footer), layout[5]);
     }
 
     fn handle_event(&mut self, event: &ParsedInput) -> CreateModalAction {
@@ -136,6 +144,25 @@ impl CreateRoomModal for TicTacToeCreateModal {
     }
 }
 
+fn name_value_span(value: &str) -> ValueSpan {
+    ValueSpan {
+        text: format!("{value}█"),
+        style: Style::default()
+            .fg(theme::AMBER())
+            .add_modifier(Modifier::BOLD),
+    }
+}
+
+fn footer_line() -> Line<'static> {
+    Line::from(vec![
+        Span::raw("  "),
+        Span::styled("↵", Style::default().fg(theme::AMBER_DIM())),
+        Span::styled(" create  ", Style::default().fg(theme::TEXT_DIM())),
+        Span::styled("Esc", Style::default().fg(theme::AMBER_DIM())),
+        Span::styled(" cancel", Style::default().fg(theme::TEXT_DIM())),
+    ])
+}
+
 fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
     Rect {
         x: area.x + area.width.saturating_sub(width) / 2,
@@ -147,41 +174,60 @@ fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
 
 fn section_heading(title: &str) -> Line<'static> {
     Line::from(vec![
-        Span::styled("  -- ", Style::default().fg(theme::BORDER())),
+        Span::styled("  ── ", Style::default().fg(theme::BORDER())),
         Span::styled(
             title.to_string(),
             Style::default()
                 .fg(theme::AMBER())
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" --", Style::default().fg(theme::BORDER())),
+        Span::styled(" ──", Style::default().fg(theme::BORDER())),
     ])
 }
 
-fn name_row(value: &str, width: usize) -> Line<'static> {
-    let value = format!("{value}█");
-    let label = format!("{:<10}", "Name");
-    let used = 3 + label.chars().count() + value.chars().count();
-    let padding = width.saturating_sub(used);
-    Line::from(vec![
-        Span::styled(" › ", Style::default().fg(theme::AMBER())),
-        Span::styled(label, Style::default().fg(theme::TEXT_DIM())),
-        Span::styled(
-            value,
-            Style::default()
-                .fg(theme::TEXT_BRIGHT())
-                .bg(theme::BG_SELECTION())
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" ".repeat(padding)),
-    ])
+struct ValueSpan {
+    text: String,
+    style: Style,
 }
 
-fn footer_line() -> Line<'static> {
+fn field_row(focused: bool, label: &str, value: ValueSpan, width: usize) -> Line<'static> {
+    let marker = if focused { "›" } else { " " };
+    let prefix_style = if focused {
+        Style::default()
+            .fg(theme::AMBER_GLOW())
+            .bg(theme::BG_SELECTION())
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(theme::TEXT_FAINT())
+    };
+    let label_style = if focused {
+        Style::default()
+            .fg(theme::TEXT_BRIGHT())
+            .bg(theme::BG_SELECTION())
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(theme::TEXT_DIM())
+    };
+    let value_style = if focused {
+        value.style.bg(theme::BG_SELECTION())
+    } else {
+        value.style
+    };
+    let trailing_style = if focused {
+        Style::default().bg(theme::BG_SELECTION())
+    } else {
+        Style::default()
+    };
+
+    let prefix = format!(" {marker} ");
+    let label_text = format!("{label:<LABEL_WIDTH$}");
+    let used = prefix.chars().count() + label_text.chars().count() + value.text.chars().count();
+    let padding = width.saturating_sub(used.min(width));
+
     Line::from(vec![
-        Span::styled("Enter", Style::default().fg(theme::AMBER_DIM())),
-        Span::styled(" create  ", Style::default().fg(theme::TEXT_DIM())),
-        Span::styled("Esc", Style::default().fg(theme::AMBER_DIM())),
-        Span::styled(" cancel", Style::default().fg(theme::TEXT_DIM())),
+        Span::styled(prefix, prefix_style),
+        Span::styled(label_text, label_style),
+        Span::styled(value.text, value_style),
+        Span::styled(" ".repeat(padding), trailing_style),
     ])
 }

@@ -164,7 +164,7 @@ fn draw_filter_bar(frame: &mut Frame, area: Rect, view: &RoomsPageView<'_>) {
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
-const PICKER_MODAL_WIDTH: u16 = 44;
+const PICKER_MODAL_WIDTH: u16 = 56;
 
 fn draw_create_picker_modal(
     frame: &mut Frame,
@@ -173,8 +173,9 @@ fn draw_create_picker_modal(
     kind_index: usize,
 ) {
     let kinds = view.room_game_registry.ordered_kinds();
-    let height = (kinds.len() as u16).saturating_add(5).max(7);
-    let modal_area = centered_rect(
+    // 2 borders + 1 breathing + 1 heading + 1 breathing + N rows + 1 flex + 1 footer
+    let height = (kinds.len() as u16).saturating_add(7).max(9);
+    let modal_area = picker_centered_rect(
         area,
         PICKER_MODAL_WIDTH.min(area.width),
         height.min(area.height),
@@ -193,37 +194,104 @@ fn draw_create_picker_modal(
     let inner = block.inner(modal_area);
     frame.render_widget(block, modal_area);
 
-    let mut lines: Vec<Line> = Vec::with_capacity(kinds.len() + 2);
+    let layout = Layout::vertical([
+        Constraint::Length(1),                  // breathing
+        Constraint::Length(1),                  // heading
+        Constraint::Length(1),                  // breathing
+        Constraint::Length(kinds.len() as u16), // rows
+        Constraint::Min(0),                     // flex
+        Constraint::Length(1),                  // footer
+    ])
+    .split(inner);
+
+    frame.render_widget(
+        Paragraph::new(picker_section_heading("Choose a game")),
+        layout[1],
+    );
+
+    let body_width = layout[3].width as usize;
+    let mut rows: Vec<Line> = Vec::with_capacity(kinds.len());
     for (index, kind) in kinds.iter().enumerate() {
-        let selected = index == kind_index;
-        let style = if selected {
-            Style::default()
-                .fg(theme::TEXT_BRIGHT())
-                .bg(theme::BG_SELECTION())
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(theme::TEXT())
-        };
-        let pointer = if selected { "› " } else { "  " };
-        lines.push(Line::from(vec![
-            Span::styled(pointer, Style::default().fg(theme::AMBER())),
-            Span::styled(view.room_game_registry.label(*kind), style),
-        ]));
+        rows.push(picker_row(
+            view.room_game_registry.label(*kind),
+            view.room_game_registry.slug_prefix(*kind),
+            index == kind_index,
+            body_width,
+        ));
     }
-    lines.push(Line::raw(""));
-    lines.push(Line::from(vec![
-        Span::styled("↑/↓", Style::default().fg(theme::AMBER_DIM())),
+    frame.render_widget(Paragraph::new(rows), layout[3]);
+
+    let footer = Line::from(vec![
+        Span::raw("  "),
+        Span::styled("↑↓ j/k", Style::default().fg(theme::AMBER_DIM())),
         Span::styled(" choose  ", Style::default().fg(theme::TEXT_DIM())),
         Span::styled("↵", Style::default().fg(theme::AMBER_DIM())),
         Span::styled(" open  ", Style::default().fg(theme::TEXT_DIM())),
         Span::styled("Esc", Style::default().fg(theme::AMBER_DIM())),
         Span::styled(" cancel", Style::default().fg(theme::TEXT_DIM())),
-    ]));
-
-    frame.render_widget(Paragraph::new(lines), inner);
+    ]);
+    frame.render_widget(Paragraph::new(footer), layout[5]);
 }
 
-fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
+fn picker_section_heading(title: &str) -> Line<'static> {
+    Line::from(vec![
+        Span::styled("  ── ", Style::default().fg(theme::BORDER())),
+        Span::styled(
+            title.to_string(),
+            Style::default()
+                .fg(theme::AMBER())
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ──", Style::default().fg(theme::BORDER())),
+    ])
+}
+
+fn picker_row(label: &str, slug: &str, selected: bool, width: usize) -> Line<'static> {
+    let marker = if selected { "›" } else { " " };
+    let prefix_style = if selected {
+        Style::default()
+            .fg(theme::AMBER_GLOW())
+            .bg(theme::BG_SELECTION())
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(theme::TEXT_FAINT())
+    };
+    let label_style = if selected {
+        Style::default()
+            .fg(theme::TEXT_BRIGHT())
+            .bg(theme::BG_SELECTION())
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(theme::TEXT_BRIGHT())
+    };
+    let slug_style = if selected {
+        Style::default()
+            .fg(theme::TEXT_DIM())
+            .bg(theme::BG_SELECTION())
+    } else {
+        Style::default().fg(theme::TEXT_FAINT())
+    };
+    let trailing_style = if selected {
+        Style::default().bg(theme::BG_SELECTION())
+    } else {
+        Style::default()
+    };
+
+    let prefix = format!(" {marker} ");
+    let label_text = label.to_string();
+    let slug_text = format!("   ({slug})");
+    let used = prefix.chars().count() + label_text.chars().count() + slug_text.chars().count();
+    let padding = width.saturating_sub(used.min(width));
+
+    Line::from(vec![
+        Span::styled(prefix, prefix_style),
+        Span::styled(label_text, label_style),
+        Span::styled(slug_text, slug_style),
+        Span::styled(" ".repeat(padding), trailing_style),
+    ])
+}
+
+fn picker_centered_rect(area: Rect, width: u16, height: u16) -> Rect {
     let width = width.min(area.width);
     let height = height.min(area.height);
     Rect {

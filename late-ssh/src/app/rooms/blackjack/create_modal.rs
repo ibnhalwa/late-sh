@@ -17,7 +17,7 @@ use crate::app::{
 
 const DISPLAY_NAME_MAX_LEN: usize = 48;
 const MODAL_WIDTH: u16 = 64;
-const MODAL_HEIGHT: u16 = 14;
+const MODAL_HEIGHT: u16 = 16;
 const LABEL_WIDTH: usize = 10;
 const FIELD_NAME: usize = 0;
 const FIELD_PACE: usize = 1;
@@ -105,7 +105,7 @@ impl CreateRoomModal for BlackjackCreateModal {
         frame.render_widget(Clear, modal_area);
 
         let block = Block::default()
-            .title(" Blackjack Room ")
+            .title(" New Blackjack Room ")
             .title_style(
                 Style::default()
                     .fg(theme::AMBER_GLOW())
@@ -117,63 +117,70 @@ impl CreateRoomModal for BlackjackCreateModal {
         frame.render_widget(block, modal_area);
 
         let layout = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(1),
+            Constraint::Length(1), // breathing
+            Constraint::Length(1), // Table heading
+            Constraint::Length(1), // breathing
+            Constraint::Length(1), // name row
+            Constraint::Length(1), // breathing
+            Constraint::Length(1), // Options heading
+            Constraint::Length(1), // breathing
+            Constraint::Length(1), // pace row
+            Constraint::Length(1), // stake row
+            Constraint::Min(0),    // flex
+            Constraint::Length(1), // footer
         ])
         .split(inner);
 
+        let width = inner.width as usize;
+
         frame.render_widget(Paragraph::new(section_heading("Table")), layout[1]);
         frame.render_widget(
-            Paragraph::new(name_row(
+            Paragraph::new(field_row(
                 self.focus_index == FIELD_NAME,
-                &self.display_name,
-                inner.width as usize,
+                "Name",
+                name_value_span(self.focus_index == FIELD_NAME, &self.display_name),
+                width,
             )),
-            layout[2],
+            layout[3],
         );
-        frame.render_widget(Paragraph::new(section_heading("Options")), layout[4]);
+
+        frame.render_widget(Paragraph::new(section_heading("Options")), layout[5]);
         frame.render_widget(
-            Paragraph::new(option_row(
+            Paragraph::new(field_row(
                 self.focus_index == FIELD_PACE,
                 "Pace",
-                PACE_OPTIONS.iter().map(|pace| pace.label()).collect(),
-                self.pace_index,
-                inner.width as usize,
+                option_value_span(
+                    PACE_OPTIONS.iter().map(|pace| pace.label().to_string()),
+                    self.pace_index,
+                ),
+                width,
             )),
-            layout[5],
+            layout[7],
         );
         frame.render_widget(
-            Paragraph::new(option_row(
+            Paragraph::new(field_row(
                 self.focus_index == FIELD_STAKE,
                 "Stake",
-                STAKE_OPTIONS
-                    .iter()
-                    .map(|stake| format!("{stake}"))
-                    .collect(),
-                self.stake_index,
-                inner.width as usize,
+                option_value_span(
+                    STAKE_OPTIONS.iter().map(|stake| format!("{stake}")),
+                    self.stake_index,
+                ),
+                width,
             )),
-            layout[6],
+            layout[8],
         );
 
         let footer = self
             .error
             .as_ref()
             .map(|message| {
-                Line::from(Span::styled(
-                    message.clone(),
-                    Style::default().fg(theme::ERROR()),
-                ))
+                Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(message.clone(), Style::default().fg(theme::ERROR())),
+                ])
             })
             .unwrap_or_else(footer_line);
-        frame.render_widget(Paragraph::new(footer), layout[8]);
+        frame.render_widget(Paragraph::new(footer), layout[10]);
     }
 
     fn handle_event(&mut self, event: &ParsedInput) -> CreateModalAction {
@@ -188,6 +195,14 @@ impl CreateRoomModal for BlackjackCreateModal {
                 self.move_focus(-1);
                 CreateModalAction::Continue
             }
+            ParsedInput::Char('j' | 'J') if self.focus_index != FIELD_NAME => {
+                self.move_focus(1);
+                CreateModalAction::Continue
+            }
+            ParsedInput::Char('k' | 'K') if self.focus_index != FIELD_NAME => {
+                self.move_focus(-1);
+                CreateModalAction::Continue
+            }
             ParsedInput::Arrow(b'D') => {
                 self.adjust_selection(-1);
                 CreateModalAction::Continue
@@ -196,11 +211,11 @@ impl CreateRoomModal for BlackjackCreateModal {
                 self.adjust_selection(1);
                 CreateModalAction::Continue
             }
-            ParsedInput::Char('a' | 'A') if self.focus_index != FIELD_NAME => {
+            ParsedInput::Char('h' | 'H') if self.focus_index != FIELD_NAME => {
                 self.adjust_selection(-1);
                 CreateModalAction::Continue
             }
-            ParsedInput::Char('d' | 'D') if self.focus_index != FIELD_NAME => {
+            ParsedInput::Char('l' | 'L') if self.focus_index != FIELD_NAME => {
                 self.adjust_selection(1);
                 CreateModalAction::Continue
             }
@@ -236,6 +251,70 @@ impl CreateRoomModal for BlackjackCreateModal {
     }
 }
 
+fn name_value_span(focused: bool, value: &str) -> ValueSpan {
+    if focused {
+        ValueSpan {
+            text: format!("{value}█"),
+            style: Style::default()
+                .fg(theme::AMBER())
+                .add_modifier(Modifier::BOLD),
+        }
+    } else if value.trim().is_empty() {
+        ValueSpan {
+            text: "not set".to_string(),
+            style: Style::default().fg(theme::TEXT_FAINT()),
+        }
+    } else {
+        ValueSpan {
+            text: value.to_string(),
+            style: Style::default().fg(theme::TEXT_BRIGHT()),
+        }
+    }
+}
+
+fn option_value_span<I, S>(options: I, selected_index: usize) -> ValueSpan
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
+    let mut text = String::new();
+    for (index, option) in options.into_iter().enumerate() {
+        if index > 0 {
+            text.push_str("   ");
+        }
+        let option = option.into();
+        if index == selected_index {
+            text.push('[');
+            text.push_str(&option);
+            text.push(']');
+        } else {
+            text.push(' ');
+            text.push_str(&option);
+            text.push(' ');
+        }
+    }
+    ValueSpan {
+        text,
+        style: Style::default()
+            .fg(theme::TEXT_BRIGHT())
+            .add_modifier(Modifier::BOLD),
+    }
+}
+
+fn footer_line() -> Line<'static> {
+    Line::from(vec![
+        Span::raw("  "),
+        Span::styled("Tab ↑↓", Style::default().fg(theme::AMBER_DIM())),
+        Span::styled(" field  ", Style::default().fg(theme::TEXT_DIM())),
+        Span::styled("←→", Style::default().fg(theme::AMBER_DIM())),
+        Span::styled(" cycle  ", Style::default().fg(theme::TEXT_DIM())),
+        Span::styled("↵", Style::default().fg(theme::AMBER_DIM())),
+        Span::styled(" create  ", Style::default().fg(theme::TEXT_DIM())),
+        Span::styled("Esc", Style::default().fg(theme::AMBER_DIM())),
+        Span::styled(" cancel", Style::default().fg(theme::TEXT_DIM())),
+    ])
+}
+
 fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
     Rect {
         x: area.x + area.width.saturating_sub(width) / 2,
@@ -247,83 +326,61 @@ fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
 
 fn section_heading(title: &str) -> Line<'static> {
     Line::from(vec![
-        Span::styled("  -- ", Style::default().fg(theme::BORDER())),
+        Span::styled("  ── ", Style::default().fg(theme::BORDER())),
         Span::styled(
             title.to_string(),
             Style::default()
                 .fg(theme::AMBER())
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" --", Style::default().fg(theme::BORDER())),
+        Span::styled(" ──", Style::default().fg(theme::BORDER())),
     ])
 }
 
-fn name_row(focused: bool, value: &str, width: usize) -> Line<'static> {
-    let text = if focused {
-        format!("{value}█")
-    } else if value.trim().is_empty() {
-        "not set".to_string()
+struct ValueSpan {
+    text: String,
+    style: Style,
+}
+
+fn field_row(focused: bool, label: &str, value: ValueSpan, width: usize) -> Line<'static> {
+    let marker = if focused { "›" } else { " " };
+    let prefix_style = if focused {
+        Style::default()
+            .fg(theme::AMBER_GLOW())
+            .bg(theme::BG_SELECTION())
+            .add_modifier(Modifier::BOLD)
     } else {
-        value.to_string()
+        Style::default().fg(theme::TEXT_FAINT())
     };
-    row_with_value(focused, "Name", text, width)
-}
-
-fn option_row(
-    focused: bool,
-    label: &str,
-    options: Vec<impl Into<String>>,
-    selected_index: usize,
-    width: usize,
-) -> Line<'static> {
-    let mut value = String::new();
-    for (index, option) in options.into_iter().enumerate() {
-        if index > 0 {
-            value.push_str("  ");
-        }
-        let option = option.into();
-        if index == selected_index {
-            value.push('[');
-            value.push_str(&option);
-            value.push(']');
-        } else {
-            value.push_str(&option);
-        }
-    }
-    row_with_value(focused, label, value, width)
-}
-
-fn row_with_value(focused: bool, label: &str, value: String, width: usize) -> Line<'static> {
-    let style = if focused {
+    let label_style = if focused {
         Style::default()
             .fg(theme::TEXT_BRIGHT())
             .bg(theme::BG_SELECTION())
             .add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(theme::TEXT())
+        Style::default().fg(theme::TEXT_DIM())
     };
-    let marker = if focused { "›" } else { " " };
-    let label = format!("{:<LABEL_WIDTH$}", label);
-    let used = 3 + label.chars().count() + value.chars().count();
-    let padding = width.saturating_sub(used);
-    Line::from(vec![
-        Span::styled(format!(" {marker} "), Style::default().fg(theme::AMBER())),
-        Span::styled(label, Style::default().fg(theme::TEXT_DIM())),
-        Span::styled(value, style),
-        Span::raw(" ".repeat(padding)),
-    ])
-}
+    let value_style = if focused {
+        value.style.bg(theme::BG_SELECTION())
+    } else {
+        value.style
+    };
+    let trailing_style = if focused {
+        Style::default().bg(theme::BG_SELECTION())
+    } else {
+        Style::default()
+    };
 
-fn footer_line() -> Line<'static> {
+    let prefix = format!(" {marker} ");
+    let label_text = format!("{label:<LABEL_WIDTH$}");
+    let used = prefix.chars().count() + label_text.chars().count() + value.text.chars().count();
+    let padding = width.saturating_sub(used.min(width));
+
     Line::from(vec![
-        Span::styled("Tab", Style::default().fg(theme::AMBER_DIM())),
-        Span::styled(" field  ", Style::default().fg(theme::TEXT_DIM())),
-        Span::styled("a/d", Style::default().fg(theme::AMBER_DIM())),
-        Span::styled(" select  ", Style::default().fg(theme::TEXT_DIM())),
-        Span::styled("Enter", Style::default().fg(theme::AMBER_DIM())),
-        Span::styled(" create  ", Style::default().fg(theme::TEXT_DIM())),
-        Span::styled("Esc", Style::default().fg(theme::AMBER_DIM())),
-        Span::styled(" cancel", Style::default().fg(theme::TEXT_DIM())),
+        Span::styled(prefix, prefix_style),
+        Span::styled(label_text, label_style),
+        Span::styled(value.text, value_style),
+        Span::styled(" ".repeat(padding), trailing_style),
     ])
 }
 
