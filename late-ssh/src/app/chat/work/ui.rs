@@ -96,7 +96,7 @@ pub fn draw_work_list(frame: &mut Frame, area: Rect, view: &WorkListView<'_>) {
         let inner_w = content_area.width as usize;
         let mut lines: Vec<Line<'static>> = Vec::with_capacity(8);
 
-        // Row 1: title — `* Headline` left, `(yours)` right-aligned when owner.
+        // Row 1: title — unread dot + headline left, `(yours)` right-aligned when owner.
         lines.push(build_title_line(&p.headline, owner, is_unread, inner_w));
 
         // Row 2: meta — `@user · status · type · location · just now`
@@ -181,7 +181,7 @@ pub fn draw_work_list(frame: &mut Frame, area: Rect, view: &WorkListView<'_>) {
 }
 
 fn build_title_line(headline: &str, owner: bool, is_unread: bool, width: usize) -> Line<'static> {
-    let unread_prefix = if is_unread { "* " } else { "" };
+    let unread_prefix = if is_unread { "● " } else { "" };
     let unread_w = UnicodeWidthStr::width(unread_prefix);
     let badge = if owner { "(yours)" } else { "" };
     let badge_w = UnicodeWidthStr::width(badge);
@@ -201,7 +201,7 @@ fn build_title_line(headline: &str, owner: bool, is_unread: bool, width: usize) 
     let mut spans: Vec<Span<'static>> = Vec::with_capacity(4);
     if is_unread {
         spans.push(Span::styled(
-            "* ",
+            "● ",
             Style::default()
                 .fg(theme::AMBER())
                 .add_modifier(Modifier::BOLD),
