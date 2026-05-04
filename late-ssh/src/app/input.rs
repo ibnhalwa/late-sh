@@ -1798,7 +1798,8 @@ fn apply_icon_selection(app: &mut App, keep_open: bool) {
             app.icon_picker_open = false;
             return;
         };
-        let Some(icon) = icon_picker::picker::selected_icon(&app.icon_picker_state, catalog) else {
+        let Some(icon) = icon_picker::picker::selected_chat_icon(&app.icon_picker_state, catalog)
+        else {
             if !keep_open {
                 app.icon_picker_open = false;
             }
