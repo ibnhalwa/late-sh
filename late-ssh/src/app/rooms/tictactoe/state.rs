@@ -97,6 +97,12 @@ impl State {
         self.svc.leave_seat_task(self.user_id);
     }
 
+    pub fn touch_activity(&self) {
+        if self.seat_index().is_some() {
+            self.svc.touch_activity_task(self.user_id);
+        }
+    }
+
     pub fn place_at_cursor(&self) {
         self.svc.place_task(self.user_id, self.cursor);
     }

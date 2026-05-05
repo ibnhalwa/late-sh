@@ -101,7 +101,9 @@ impl ActiveRoomBackend for State {
         State::tick(self);
     }
 
-    fn touch_activity(&self) {}
+    fn touch_activity(&self) {
+        State::touch_activity(self);
+    }
 
     fn handle_key(&mut self, byte: u8) -> crate::app::rooms::backend::InputAction {
         crate::app::rooms::tictactoe::input::handle_key(self, byte)
