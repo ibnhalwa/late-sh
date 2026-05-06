@@ -116,6 +116,7 @@ pub fn test_app_state(db: Db, config: Config) -> State {
     .with_session_registry(session_registry.clone());
     let ai_service = AiService::new(false, None, "gemini-3.1-pro-preview".to_string());
     let article_service = ArticleService::new(db.clone(), ai_service.clone(), chat_service.clone());
+    let feed_service = late_ssh::app::chat::feeds::svc::FeedService::new(db.clone());
     let showcase_service = late_ssh::app::chat::showcase::svc::ShowcaseService::new(db.clone());
     let work_service = late_ssh::app::chat::work::svc::WorkService::new(db.clone());
     let ssh_attempt_limiter = IpRateLimiter::new(
@@ -156,6 +157,7 @@ pub fn test_app_state(db: Db, config: Config) -> State {
         notification_service,
         ai_service,
         article_service,
+        feed_service,
         showcase_service,
         work_service,
         profile_service,
@@ -215,6 +217,7 @@ pub fn make_app_with_chat_service(
             AiService::new(false, None, "gemini-3.1-pro-preview".to_string()),
             chat_service.clone(),
         ),
+        feed_service: late_ssh::app::chat::feeds::svc::FeedService::new(db.clone()),
         showcase_service: late_ssh::app::chat::showcase::svc::ShowcaseService::new(db.clone()),
         work_service: late_ssh::app::chat::work::svc::WorkService::new(db.clone()),
         profile_service: ProfileService::new(db.clone(), Arc::new(Mutex::new(HashMap::new()))),
@@ -314,6 +317,7 @@ pub fn make_app_with_paired_client(
             AiService::new(false, None, "gemini-3.1-pro-preview".to_string()),
             ChatService::new(db.clone(), NotificationService::new(db.clone())),
         ),
+        feed_service: late_ssh::app::chat::feeds::svc::FeedService::new(db.clone()),
         showcase_service: late_ssh::app::chat::showcase::svc::ShowcaseService::new(db.clone()),
         work_service: late_ssh::app::chat::work::svc::WorkService::new(db.clone()),
         profile_service: ProfileService::new(db.clone(), Arc::new(Mutex::new(HashMap::new()))),
