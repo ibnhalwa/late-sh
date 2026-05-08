@@ -399,6 +399,8 @@ fn draw_settings_tab(frame: &mut Frame, area: Rect, state: &SettingsModalState) 
         Constraint::Length(1), // Bell
         Constraint::Length(1), // Cooldown
         Constraint::Length(1), // Format
+        Constraint::Length(1), // breathing room
+        Constraint::Length(1), // shortcuts hint
     ])
     .split(area);
 
@@ -627,6 +629,43 @@ fn draw_settings_tab(frame: &mut Frame, area: Rect, state: &SettingsModalState) 
         )),
         sections[23],
     );
+
+    frame.render_widget(Paragraph::new(shortcuts_hint_line(width)), sections[25]);
+}
+
+fn shortcuts_hint_line(width: usize) -> Line<'static> {
+    let bg = theme::BG_HIGHLIGHT();
+    let key_style = Style::default()
+        .fg(theme::AMBER_GLOW())
+        .bg(bg)
+        .add_modifier(Modifier::BOLD);
+    let text_style = Style::default().fg(theme::TEXT_BRIGHT()).bg(bg);
+    let bg_style = Style::default().bg(bg);
+
+    let leading = "   ";
+    let key1 = "?";
+    let text1 = "  app tour";
+    let separator = "      ";
+    let key2 = "Ctrl+O";
+    let text2 = "  reopen settings anywhere";
+
+    let used = leading.chars().count()
+        + key1.chars().count()
+        + text1.chars().count()
+        + separator.chars().count()
+        + key2.chars().count()
+        + text2.chars().count();
+    let trailing = " ".repeat(width.saturating_sub(used));
+
+    Line::from(vec![
+        Span::styled(leading, bg_style),
+        Span::styled(key1, key_style),
+        Span::styled(text1, text_style),
+        Span::styled(separator, bg_style),
+        Span::styled(key2, key_style),
+        Span::styled(text2, text_style),
+        Span::styled(trailing, bg_style),
+    ])
 }
 
 fn draw_special_tab(frame: &mut Frame, area: Rect, state: &SettingsModalState) {
