@@ -476,10 +476,7 @@ fn draw_seat_panel_outline(
 
     // Row 4: latest visible seat result/action (single line).
     if let Some(line) = seat_notice_line(seat) {
-        frame.render_widget(
-            Paragraph::new(line).alignment(Alignment::Center),
-            rows[4],
-        );
+        frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), rows[4]);
     }
 }
 
@@ -558,7 +555,11 @@ fn balance_line<'a>(
     let Some(player) = &seat.player else {
         return Line::from("");
     };
-    let balance = if is_you { snapshot.balance } else { player.balance };
+    let balance = if is_you {
+        snapshot.balance
+    } else {
+        player.balance
+    };
     Line::from(vec![
         Span::styled("$", Style::default().fg(theme::TEXT_DIM())),
         Span::styled(balance.to_string(), Style::default().fg(theme::SUCCESS())),
