@@ -96,7 +96,11 @@ pub fn lines_for(topic: HelpTopic) -> Vec<String> {
 }
 
 pub fn bot_app_context() -> String {
-    let mut out = String::from("APP CONTEXT:\n");
+    let mut out = String::from(
+        "APP CONTEXT:\n\
+        CRITICAL FACTS:\n\
+        - The glyph/icon next to a chat username is only the user's bonsai stage/state. It is not an Arcade streak badge, country flag, or custom contributor icon.\n",
+    );
     for topic in HelpTopic::ALL {
         out.push_str(&format!("## {}\n", topic.title()));
         for line in lines_for(topic) {
@@ -336,7 +340,7 @@ fn rooms_help_lines() -> Vec<String> {
         "  Arrows            game gets first chance; otherwise embedded chat handles them",
         "",
         "Dashboard room shortcuts",
-        "  b then 1          enter Blackjack room slot 1",
+        "  b then 1          enter busiest game room",
         "  b then 2          launch current unfinished daily game",
         "  b then 3          open current Wire/News article",
         "  b then 4          open #announcements",
@@ -368,6 +372,7 @@ fn rooms_help_lines() -> Vec<String> {
         "  b / r             bet or raise",
         "  [ / ] or - / +    adjust selected bet/raise amount",
         "  a                 all-in",
+        "  x                 toggle auto check/fold",
         "  f                 fold",
         "  l                 leave seat",
         "",
@@ -422,7 +427,7 @@ fn overview_lines() -> Vec<String> {
         "  `                 toggle Dashboard / last game",
         "",
         "Dashboard boxes",
-        "  b then 1          enter Blackjack room slot 1",
+        "  b then 1          enter busiest game room",
         "  b then 2          launch current unfinished daily game",
         "  b then 3          open current Wire/News article",
         "  b then 4          open #announcements",
@@ -549,7 +554,7 @@ fn arcade_help_lines() -> Vec<String> {
         "  daily puzzles build streaks",
         "  wins can award Late Chips",
         "  leaderboard tracks streak leaders, all-time highs, and chip balances",
-        "  chat badges reflect streak tiers",
+        "  Arcade streaks stay in Arcade/leaderboard surfaces; they are not chat username badges",
         "",
         "Why it exists",
         "",
@@ -660,7 +665,7 @@ fn settings_help_lines() -> Vec<String> {
         "".to_string(),
         "Why country matters".to_string(),
         "".to_string(),
-        "The saved ISO country code can later render a flag in chat and other user surfaces."
+        "The saved ISO country code belongs to profile/settings identity surfaces; it is not the chat username badge."
             .to_string(),
         "".to_string(),
         "Notifications".to_string(),
@@ -725,6 +730,7 @@ fn bonsai_help_lines() -> Vec<String> {
         "Why it matters",
         "  it gives the app a calm personal loop outside chat and games",
         "  the tree becomes a little signature of how you inhabit late.sh over time",
+        "  the only glyph/icon next to a chat username is that user's bonsai stage/state",
     ]
     .into_iter()
     .map(str::to_string)
