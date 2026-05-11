@@ -419,12 +419,11 @@ fn chat_rows_fingerprint(
         if let Some(lines) = ctx.inline_images.get(&msg.id) {
             true.hash(&mut hasher);
             lines.len().hash(&mut hasher);
-            for line in lines {
-                line.spans.len().hash(&mut hasher);
-                for span in &line.spans {
-                    span.content.hash(&mut hasher);
-                }
-            }
+            lines
+                .iter()
+                .map(|line| line.spans.len())
+                .sum::<usize>()
+                .hash(&mut hasher);
         } else {
             false.hash(&mut hasher);
         }
