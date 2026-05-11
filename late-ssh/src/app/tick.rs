@@ -34,6 +34,7 @@ impl App {
         // Poll image upload results.
         if let Some(result) = self.chat.poll_image_upload() {
             let target_room_id = self.chat.take_image_upload_target_room_id();
+            let fallback_text = self.chat.take_image_upload_fallback_text();
             match result {
                 Ok(url) => {
                     if let Some(room_id) = target_room_id.or(self.chat.selected_room_id) {
@@ -41,11 +42,21 @@ impl App {
                         self.chat.composer_push_str(&url);
                     }
                     self.banner = Some(crate::app::common::primitives::Banner::success(
-                        "✓ Image uploaded — press Enter to send",
+                        "Image uploaded - press Enter to send",
                     ));
                 }
                 Err(msg) => {
-                    self.banner = Some(crate::app::common::primitives::Banner::error(&msg));
+                    if let Some(text) = fallback_text {
+                        if let Some(room_id) = target_room_id.or(self.chat.selected_room_id) {
+                            self.chat.start_composing_in_room(room_id);
+                        }
+                        self.chat.composer_push_str(&text);
+                        self.banner = Some(crate::app::common::primitives::Banner::error(
+                            "Image upload was not completed - pasted URL",
+                        ));
+                    } else {
+                        self.banner = Some(crate::app::common::primitives::Banner::error(&msg));
+                    }
                 }
             }
         }

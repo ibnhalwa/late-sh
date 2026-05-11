@@ -1697,7 +1697,7 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use late_core::models::chat_room::ChatRoom;
-    use std::collections::HashMap;
+    use std::{collections::HashMap, sync::OnceLock};
 
     #[test]
     fn short_user_id_returns_first_eight_chars() {
@@ -1749,6 +1749,7 @@ mod tests {
         let countries = HashMap::new();
         let bonsai_glyphs = HashMap::new();
         let message_reactions = HashMap::new();
+        let inline_images = HashMap::new();
 
         let messages = vec![&message];
         let ctx = ChatRowsContext {
@@ -1757,6 +1758,7 @@ mod tests {
             countries: &countries,
             bonsai_glyphs: &bonsai_glyphs,
             message_reactions: &message_reactions,
+            inline_images: &inline_images,
         };
 
         theme::set_current_by_id("late");
@@ -1795,6 +1797,8 @@ mod tests {
         composer: &'a TextArea<'static>,
         news_composer: &'a TextArea<'static>,
     ) -> ChatRenderInput<'a> {
+        static INLINE_IMAGES: OnceLock<HashMap<Uuid, Vec<Line<'static>>>> = OnceLock::new();
+
         ChatRenderInput {
             feeds_selected: false,
             feeds_processing: false,
@@ -1825,6 +1829,7 @@ mod tests {
             usernames,
             countries,
             message_reactions,
+            inline_images: INLINE_IMAGES.get_or_init(HashMap::new),
             unread_counts,
             selected_room_id,
             room_jump_active: false,

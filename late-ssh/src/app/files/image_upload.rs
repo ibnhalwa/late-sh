@@ -48,8 +48,8 @@ pub fn is_file_upload_configured() -> bool {
 
 pub fn detect_image_mime(data: &[u8]) -> Option<&'static str> {
     match data {
-        d if d.starts_with(&[0x89, 0x50, 0x4E, 0x47]) => Some("image/png"),
-        d if d.starts_with(&[0xFF, 0xD8, 0xFF]) => Some("image/jpeg"),
+        [0x89, 0x50, 0x4E, 0x47, ..] => Some("image/png"),
+        [0xFF, 0xD8, 0xFF, ..] => Some("image/jpeg"),
         d if d.starts_with(b"GIF8") => Some("image/gif"),
         d if d.len() > 12 && d.starts_with(b"RIFF") && &d[8..12] == b"WEBP" => Some("image/webp"),
         _ => None,

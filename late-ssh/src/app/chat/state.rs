@@ -177,6 +177,7 @@ pub struct ChatState {
     pub(crate) image_upload_rx: Option<tokio::sync::oneshot::Receiver<Result<String, String>>>,
     pub(crate) image_upload_pending: bool,
     pub(crate) image_upload_target_room_id: Option<Uuid>,
+    pub(crate) image_upload_fallback_text: Option<String>,
     pub(crate) requested_url_upload: Option<PendingUrlUpload>,
 
     // inline image rendering
@@ -306,6 +307,7 @@ impl ChatState {
             image_upload_rx: None,
             image_upload_pending: false,
             image_upload_target_room_id: None,
+            image_upload_fallback_text: None,
             requested_url_upload: None,
             inline_image_rx: Some(inline_image_rx),
             inline_image_tx: Some(inline_image_tx),
@@ -322,6 +324,13 @@ impl ChatState {
 
     pub(crate) fn composer(&self) -> &TextArea<'static> {
         &self.composer
+    }
+
+    pub(crate) fn composer_is_blank(&self) -> bool {
+        self.composer
+            .lines()
+            .iter()
+            .all(|line| line.trim().is_empty())
     }
 
     pub(crate) fn refresh_composer_theme(&mut self) {
@@ -1228,7 +1237,7 @@ impl ChatState {
             if !url.starts_with("http://") && !url.starts_with("https://") {
                 return Some(Banner::error("/upload: URL must start with http(s)://"));
             }
-            if !crate::app::chat::image_upload::is_file_upload_configured() {
+            if !crate::app::files::image_upload::is_file_upload_configured() {
                 return Some(Banner::error("File uploads are disabled"));
             }
             let room_id = self.upload_target_room_id();
@@ -1485,10 +1494,10 @@ impl ChatState {
     }
 
     pub fn start_image_upload(&mut self, bytes: Vec<u8>) -> Option<Banner> {
-        let Some(mime) = crate::app::chat::image_upload::detect_image_mime(&bytes) else {
+        let Some(mime) = crate::app::files::image_upload::detect_image_mime(&bytes) else {
             return Some(Banner::error("Unsupported image type"));
         };
-        if !crate::app::chat::image_upload::is_file_upload_configured() {
+        if !crate::app::files::image_upload::is_file_upload_configured() {
             return Some(Banner::error("File uploads are disabled"));
         }
 
@@ -1499,7 +1508,7 @@ impl ChatState {
         let mime = mime.to_string();
 
         tokio::spawn(async move {
-            let result = crate::app::chat::image_upload::upload_image_bytes(bytes, &mime)
+            let result = crate::app::files::image_upload::upload_image_bytes(bytes, &mime)
                 .await
                 .map_err(|e| e.to_string());
             let _ = tx.send(result);
@@ -1516,6 +1525,15 @@ impl ChatState {
         &mut self,
         room_id: Option<Uuid>,
         rx: tokio::sync::oneshot::Receiver<Result<String, String>>,
+    ) -> Option<Banner> {
+        self.begin_image_upload_with_fallback(room_id, rx, None)
+    }
+
+    pub(crate) fn begin_image_upload_with_fallback(
+        &mut self,
+        room_id: Option<Uuid>,
+        rx: tokio::sync::oneshot::Receiver<Result<String, String>>,
+        fallback_text: Option<String>,
     ) -> Option<Banner> {
         if self.image_upload_pending {
             return Some(Banner::error("An image upload is already in progress"));
@@ -1535,12 +1553,17 @@ impl ChatState {
         self.image_upload_rx = Some(rx);
         self.image_upload_pending = true;
         self.image_upload_target_room_id = room_id;
+        self.image_upload_fallback_text = fallback_text;
         self.last_image_upload_at = Some(std::time::Instant::now());
         None
     }
 
     pub(crate) fn take_image_upload_target_room_id(&mut self) -> Option<Uuid> {
         self.image_upload_target_room_id.take()
+    }
+
+    pub(crate) fn take_image_upload_fallback_text(&mut self) -> Option<String> {
+        self.image_upload_fallback_text.take()
     }
 
     pub(crate) fn take_requested_url_upload(&mut self) -> Option<PendingUrlUpload> {
@@ -1551,12 +1574,18 @@ impl ChatState {
         let rx = self.image_upload_rx.as_mut()?;
         match rx.try_recv() {
             Ok(result) => {
+                if result.is_err() && self.image_upload_fallback_text.is_some() {
+                    self.last_image_upload_at = None;
+                }
                 self.image_upload_rx = None;
                 self.image_upload_pending = false;
                 Some(result)
             }
             Err(tokio::sync::oneshot::error::TryRecvError::Empty) => None,
             Err(tokio::sync::oneshot::error::TryRecvError::Closed) => {
+                if self.image_upload_fallback_text.is_some() {
+                    self.last_image_upload_at = None;
+                }
                 self.image_upload_rx = None;
                 self.image_upload_pending = false;
                 Some(Err("Upload cancelled".to_string()))
@@ -1630,10 +1659,10 @@ impl ChatState {
                 let tx_clone = tx.clone();
                 let client = self.http_client.clone();
                 tokio::spawn(async move {
-                    // High-detail thumbnail: 96 wide, max 8 rows (16 pixels)
+                    // High-detail thumbnail: 96 wide, max 10 rows (20 pixels)
                     if let Ok(lines) =
-                        crate::app::chat::inline_image::fetch_and_render_image_with_client(
-                            client, url, 96, 8,
+                        crate::app::files::inline_image::fetch_and_render_image_with_client(
+                            client, url, 96, 10,
                         )
                         .await
                     {
