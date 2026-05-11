@@ -111,7 +111,7 @@ impl State {
                 .iter()
                 .find(|game| {
                     game.mode == "daily"
-                        && game.size_key == difficulty.key
+                        && game.difficulty_key == difficulty.key
                         && is_current_daily_game(game.puzzle_date, today)
                 })
                 .and_then(|game| snapshot_from_game(game, pack))
@@ -123,7 +123,7 @@ impl State {
 
             if let Some(snapshot) = saved_games
                 .iter()
-                .find(|game| game.mode == "personal" && game.size_key == difficulty.key)
+                .find(|game| game.mode == "personal" && game.difficulty_key == difficulty.key)
                 .and_then(|game| snapshot_from_game(game, pack))
             {
                 personal_snapshots.insert(difficulty.key.to_string(), snapshot);
@@ -338,8 +338,7 @@ impl State {
         }
         self.store_active_snapshot();
         self.selected_difficulty =
-            (self.selected_difficulty + DIFFICULTIES.len().saturating_sub(1))
-                % DIFFICULTIES.len();
+            (self.selected_difficulty + DIFFICULTIES.len().saturating_sub(1)) % DIFFICULTIES.len();
         self.load_mode_snapshot_for_selected_pack();
     }
 
@@ -433,9 +432,9 @@ impl State {
     }
 
     fn save_async(&self) {
-        let Some(pack) = self.selected_pack() else {
+        if self.selected_pack().is_none() {
             return;
-        };
+        }
         if self.current_puzzle_id.is_empty() {
             return;
         }
@@ -443,7 +442,7 @@ impl State {
         self.svc.save_game_task(GameParams {
             user_id: self.user_id,
             mode: self.mode.as_str().to_string(),
-            size_key: self.difficulty_key().to_string(),
+            difficulty_key: self.difficulty_key().to_string(),
             puzzle_date: puzzle_date_for_mode(self.mode, self.svc.today()),
             puzzle_id: self.current_puzzle_id.clone(),
             player_grid: serde_json::to_value(&self.player_grid).unwrap_or_default(),
@@ -541,8 +540,7 @@ fn default_selected_difficulty(library: &Library) -> usize {
     DIFFICULTIES
         .iter()
         .position(|difficulty| {
-            difficulty.key == "medium"
-                && library.pack_by_size_key(difficulty.size_key).is_some()
+            difficulty.key == "medium" && library.pack_by_size_key(difficulty.size_key).is_some()
         })
         .or_else(|| {
             DIFFICULTIES
