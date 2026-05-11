@@ -1174,7 +1174,6 @@ fn handle_bracketed_paste(app: &mut App, pasted: &[u8]) {
     let ctx = InputContext::from_app(app);
     match paste_target(ctx) {
         PasteTarget::ChatComposer => {
-            // Si le contenu est une image → upload au lieu d'insérer du texte
             if crate::app::chat::image_upload::detect_image_mime(pasted).is_some() {
                 trigger_image_upload(app, pasted.to_vec());
                 return;
@@ -1196,31 +1195,29 @@ fn handle_bracketed_paste(app: &mut App, pasted: &[u8]) {
 }
 
 fn trigger_image_upload(app: &mut App, data: Vec<u8>) {
-    use crate::app::chat::image_upload::{detect_image_mime, upload_image_bytes};
-    let mime = match detect_image_mime(&data) {
-        Some(m) => m,
-        None => return,
-    };
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    app.chat.image_upload_rx = Some(rx);
-    app.chat.image_upload_pending = true;
-    let mime = mime.to_string();
-    tokio::spawn(async move {
-        let result = upload_image_bytes(data, &mime)
-            .await
-            .map_err(|e| e.to_string());
-        let _ = tx.send(result);
-    });
+    if let Some(banner) = app.chat.start_image_upload(data) {
+        app.banner = Some(banner);
+        return;
+    }
     app.banner = Some(crate::app::common::primitives::Banner::success(
-        "⬆ Image détectée — upload en cours...",
+        "Image detected - uploading...",
     ));
 }
 
-pub(crate) fn trigger_url_image_upload(app: &mut App, url: String) {
-    use crate::app::chat::image_upload::download_and_reupload_url;
+pub(crate) fn trigger_url_image_upload(app: &mut App, url: String, room_id: Option<uuid::Uuid>) {
+    use crate::app::chat::image_upload::{download_and_reupload_url, is_file_upload_configured};
+    if !is_file_upload_configured() {
+        app.banner = Some(crate::app::common::primitives::Banner::error(
+            "File uploads are disabled",
+        ));
+        return;
+    }
+
     let (tx, rx) = tokio::sync::oneshot::channel();
-    app.chat.image_upload_rx = Some(rx);
-    app.chat.image_upload_pending = true;
+    if let Some(banner) = app.chat.begin_image_upload(room_id, rx) {
+        app.banner = Some(banner);
+        return;
+    }
     tokio::spawn(async move {
         let result = download_and_reupload_url(url)
             .await
@@ -1228,7 +1225,7 @@ pub(crate) fn trigger_url_image_upload(app: &mut App, url: String) {
         let _ = tx.send(result);
     });
     app.banner = Some(crate::app::common::primitives::Banner::success(
-        "⬆ Téléchargement et upload en cours...",
+        "Downloading and uploading image...",
     ));
 }
 

@@ -71,6 +71,12 @@ pub(crate) struct ModCommandOutput {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PendingUrlUpload {
+    pub url: String,
+    pub room_id: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NewsModalState {
     pub payload: NewsPayload,
     pub meta: String,
@@ -170,13 +176,18 @@ pub struct ChatState {
     // image upload
     pub(crate) image_upload_rx: Option<tokio::sync::oneshot::Receiver<Result<String, String>>>,
     pub(crate) image_upload_pending: bool,
-    pub(crate) requested_url_upload: Option<String>,
-    
+    pub(crate) image_upload_target_room_id: Option<Uuid>,
+    pub(crate) requested_url_upload: Option<PendingUrlUpload>,
+
     // inline image rendering
     pub(crate) http_client: reqwest::Client,
-    pub(crate) inline_image_rx: Option<tokio::sync::mpsc::UnboundedReceiver<(uuid::Uuid, Vec<ratatui::text::Line<'static>>)>>,
-    pub(crate) inline_image_tx: Option<tokio::sync::mpsc::UnboundedSender<(uuid::Uuid, Vec<ratatui::text::Line<'static>>)>>,
-    pub(crate) inline_image_cache: std::collections::HashMap<uuid::Uuid, Vec<ratatui::text::Line<'static>>>,
+    pub(crate) inline_image_rx: Option<
+        tokio::sync::mpsc::UnboundedReceiver<(uuid::Uuid, Vec<ratatui::text::Line<'static>>)>,
+    >,
+    pub(crate) inline_image_tx:
+        Option<tokio::sync::mpsc::UnboundedSender<(uuid::Uuid, Vec<ratatui::text::Line<'static>>)>>,
+    pub(crate) inline_image_cache:
+        std::collections::HashMap<uuid::Uuid, Vec<ratatui::text::Line<'static>>>,
     pub(crate) inline_image_requested: std::collections::HashSet<uuid::Uuid>,
     pub(crate) last_image_upload_at: Option<std::time::Instant>,
 }
@@ -294,6 +305,7 @@ impl ChatState {
             pending_mod_outputs: VecDeque::new(),
             image_upload_rx: None,
             image_upload_pending: false,
+            image_upload_target_room_id: None,
             requested_url_upload: None,
             inline_image_rx: Some(inline_image_rx),
             inline_image_tx: Some(inline_image_tx),
@@ -1214,10 +1226,14 @@ impl ChatState {
                 return Some(Banner::error("Usage: /upload <url>"));
             }
             if !url.starts_with("http://") && !url.starts_with("https://") {
-                return Some(Banner::error("/upload: l'URL doit commencer par http(s)://"));
+                return Some(Banner::error("/upload: URL must start with http(s)://"));
             }
+            if !crate::app::chat::image_upload::is_file_upload_configured() {
+                return Some(Banner::error("File uploads are disabled"));
+            }
+            let room_id = self.upload_target_room_id();
             self.clear_composer_after_submit();
-            self.requested_url_upload = Some(url);
+            self.requested_url_upload = Some(PendingUrlUpload { url, room_id });
             return None;
         }
 
@@ -1469,29 +1485,65 @@ impl ChatState {
     }
 
     pub fn start_image_upload(&mut self, bytes: Vec<u8>) -> Option<Banner> {
-        if !self.is_admin {
-            if let Some(last) = self.last_image_upload_at {
-                if last.elapsed() < std::time::Duration::from_secs(120) {
-                    let wait = 120 - last.elapsed().as_secs();
-                    return Some(Banner::error(&format!("Please wait {}s before uploading another image", wait)));
-                }
-            }
+        let Some(mime) = crate::app::chat::image_upload::detect_image_mime(&bytes) else {
+            return Some(Banner::error("Unsupported image type"));
+        };
+        if !crate::app::chat::image_upload::is_file_upload_configured() {
+            return Some(Banner::error("File uploads are disabled"));
         }
 
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.image_upload_rx = Some(rx);
-        self.image_upload_pending = true;
-        self.last_image_upload_at = Some(std::time::Instant::now());
+        if let Some(banner) = self.begin_image_upload(self.upload_target_room_id(), rx) {
+            return Some(banner);
+        }
+        let mime = mime.to_string();
 
         tokio::spawn(async move {
-            let result = crate::app::chat::image_upload::upload_image_bytes(bytes).await;
+            let result = crate::app::chat::image_upload::upload_image_bytes(bytes, &mime)
+                .await
+                .map_err(|e| e.to_string());
             let _ = tx.send(result);
         });
 
         None
     }
 
-    pub(crate) fn take_requested_url_upload(&mut self) -> Option<String> {
+    pub(crate) fn upload_target_room_id(&self) -> Option<Uuid> {
+        self.composer_room_id.or(self.selected_room_id)
+    }
+
+    pub(crate) fn begin_image_upload(
+        &mut self,
+        room_id: Option<Uuid>,
+        rx: tokio::sync::oneshot::Receiver<Result<String, String>>,
+    ) -> Option<Banner> {
+        if self.image_upload_pending {
+            return Some(Banner::error("An image upload is already in progress"));
+        }
+
+        if !self.is_admin
+            && let Some(last) = self.last_image_upload_at
+            && last.elapsed() < std::time::Duration::from_secs(120)
+        {
+            let wait = 120 - last.elapsed().as_secs();
+            return Some(Banner::error(&format!(
+                "Please wait {}s before uploading another image",
+                wait
+            )));
+        }
+
+        self.image_upload_rx = Some(rx);
+        self.image_upload_pending = true;
+        self.image_upload_target_room_id = room_id;
+        self.last_image_upload_at = Some(std::time::Instant::now());
+        None
+    }
+
+    pub(crate) fn take_image_upload_target_room_id(&mut self) -> Option<Uuid> {
+        self.image_upload_target_room_id.take()
+    }
+
+    pub(crate) fn take_requested_url_upload(&mut self) -> Option<PendingUrlUpload> {
         self.requested_url_upload.take()
     }
 
@@ -1513,14 +1565,20 @@ impl ChatState {
     }
 
     pub(crate) fn poll_inline_images(&mut self) {
-        let Some(rx) = self.inline_image_rx.as_mut() else { return };
+        let Some(rx) = self.inline_image_rx.as_mut() else {
+            return;
+        };
         while let Ok((msg_id, lines)) = rx.try_recv() {
             self.inline_image_cache.insert(msg_id, lines);
         }
 
         // Request missing images for currently visible room
-        let Some(room_id) = self.visible_room_id else { return };
-        let Some(tx) = self.inline_image_tx.clone() else { return };
+        let Some(room_id) = self.visible_room_id else {
+            return;
+        };
+        let Some(tx) = self.inline_image_tx.clone() else {
+            return;
+        };
 
         let messages = self.messages_for_room(room_id);
         if messages.is_empty() {
@@ -1529,23 +1587,35 @@ impl ChatState {
 
         let mut requests = Vec::new();
         for msg in messages.iter().rev().take(100) {
-            if self.inline_image_requested.contains(&msg.id) || self.inline_image_cache.contains_key(&msg.id) {
+            if self.inline_image_requested.contains(&msg.id)
+                || self.inline_image_cache.contains_key(&msg.id)
+            {
                 continue;
             }
             if let Some(url_start) = msg.body.find("http") {
                 let url_str = &msg.body[url_start..];
-                let end_idx = url_str.find(|c: char| c.is_ascii_whitespace() || c == ')' || c == ']' || c == '}')
+                let end_idx = url_str
+                    .find(|c: char| c.is_ascii_whitespace() || c == ')' || c == ']' || c == '}')
                     .unwrap_or(url_str.len());
                 let mut url = &url_str[..end_idx];
-                while url.ends_with('.') || url.ends_with(',') || url.ends_with(';') || url.ends_with('!') || url.ends_with('?') {
+                while url.ends_with('.')
+                    || url.ends_with(',')
+                    || url.ends_with(';')
+                    || url.ends_with('!')
+                    || url.ends_with('?')
+                {
                     url = &url[..url.len() - 1];
                 }
 
                 let lower_url = url.to_ascii_lowercase();
-                let is_image = lower_url.ends_with(".jpg") || lower_url.ends_with(".jpeg") || 
-                              lower_url.ends_with(".png") || lower_url.ends_with(".gif") || 
-                              lower_url.ends_with(".webp") || lower_url.contains("uguu.se") ||
-                              lower_url.contains("0x0.st") || lower_url.contains("catbox.moe");
+                let is_image = lower_url.ends_with(".jpg")
+                    || lower_url.ends_with(".jpeg")
+                    || lower_url.ends_with(".png")
+                    || lower_url.ends_with(".gif")
+                    || lower_url.ends_with(".webp")
+                    || lower_url.contains("uguu.se")
+                    || lower_url.contains("0x0.st")
+                    || lower_url.contains("catbox.moe");
 
                 if is_image {
                     tracing::info!("Found image URL in chat: {}", url);
@@ -1561,7 +1631,12 @@ impl ChatState {
                 let client = self.http_client.clone();
                 tokio::spawn(async move {
                     // High-detail thumbnail: 96 wide, max 8 rows (16 pixels)
-                    if let Ok(lines) = crate::app::chat::inline_image::fetch_and_render_image_with_client(client, url, 96, 8).await {
+                    if let Ok(lines) =
+                        crate::app::chat::inline_image::fetch_and_render_image_with_client(
+                            client, url, 96, 8,
+                        )
+                        .await
+                    {
                         let _ = tx_clone.send((msg_id, lines));
                     }
                 });

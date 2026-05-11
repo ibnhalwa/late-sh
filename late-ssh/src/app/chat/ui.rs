@@ -416,6 +416,18 @@ fn chat_rows_fingerprint(
         ctx.countries.get(&msg.user_id).hash(&mut hasher);
         ctx.bonsai_glyphs.get(&msg.user_id).hash(&mut hasher);
         ctx.message_reactions.get(&msg.id).hash(&mut hasher);
+        if let Some(lines) = ctx.inline_images.get(&msg.id) {
+            true.hash(&mut hasher);
+            lines.len().hash(&mut hasher);
+            for line in lines {
+                line.spans.len().hash(&mut hasher);
+                for span in &line.spans {
+                    span.content.hash(&mut hasher);
+                }
+            }
+        } else {
+            false.hash(&mut hasher);
+        }
     }
 
     hasher.finish()

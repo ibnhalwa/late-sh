@@ -85,10 +85,8 @@ pub(super) fn wrap_chat_entry_to_lines(
             continuation,
         )
     };
-    
+
     if let Some(img_lines) = inline_image_lines {
-        // Add a blank line and then the image with padding
-        lines.push(Line::from(vec![pad.clone()]));
         for img_line in img_lines {
             let mut spans = vec![pad.clone(), Span::raw(" ")];
             spans.extend(img_line.spans.iter().cloned());

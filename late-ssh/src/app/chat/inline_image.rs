@@ -1,11 +1,22 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use image::GenericImageView;
 use ratatui::{
     style::{Color, Style},
     text::{Line, Span},
 };
+use std::path::PathBuf;
 
-pub async fn fetch_and_render_image(url: String, max_width: u32, max_height: u32) -> Result<Vec<Line<'static>>> {
+fn image_cache_dir() -> PathBuf {
+    std::env::var_os("LATE_SH_IMAGE_CACHE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::temp_dir().join("late-sh").join("inline-images"))
+}
+
+pub async fn fetch_and_render_image(
+    url: String,
+    max_width: u32,
+    max_height: u32,
+) -> Result<Vec<Line<'static>>> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .user_agent("late-sh/1.0")
@@ -13,17 +24,24 @@ pub async fn fetch_and_render_image(url: String, max_width: u32, max_height: u32
     fetch_and_render_image_with_client(client, url, max_width, max_height).await
 }
 
-pub async fn fetch_and_render_image_with_client(client: reqwest::Client, url: String, max_width: u32, max_height: u32) -> Result<Vec<Line<'static>>> {
+pub async fn fetch_and_render_image_with_client(
+    client: reqwest::Client,
+    url: String,
+    max_width: u32,
+    max_height: u32,
+) -> Result<Vec<Line<'static>>> {
     use base64::Engine;
     let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let cache_key = engine.encode(&url);
-    let cache_dir = std::path::Path::new("late-ssh/cache/images");
+    let cache_dir = image_cache_dir();
     let cache_path = cache_dir.join(format!("{}_{}x{}.json", cache_key, max_width, max_height));
-    
+
     // 1. Try to load from disk cache first
     if cache_path.exists() {
         if let Ok(data) = tokio::fs::read_to_string(&cache_path).await {
-            if let Ok(lines_data) = serde_json::from_str::<Vec<Vec<(u8, u8, u8, u8, u8, u8, bool, bool)>>>(&data) {
+            if let Ok(lines_data) =
+                serde_json::from_str::<Vec<Vec<(u8, u8, u8, u8, u8, u8, bool, bool)>>>(&data)
+            {
                 let mut lines = Vec::new();
                 for row in lines_data {
                     let mut spans = Vec::new();
@@ -55,10 +73,10 @@ pub async fn fetch_and_render_image_with_client(client: reqwest::Client, url: St
         tracing::error!("HTTP error fetching image ({}): {}", url, resp.status());
         bail!("HTTP {}", resp.status());
     }
-    
+
     let bytes = resp.bytes().await?;
     tracing::info!("Image downloaded: {} bytes", bytes.len());
-    
+
     let lines_to_cache = tokio::task::spawn_blocking(move || {
         tracing::info!("Decoding image...");
         let img = match image::load_from_memory(&bytes) {
@@ -69,24 +87,24 @@ pub async fn fetch_and_render_image_with_client(client: reqwest::Client, url: St
             }
         };
         tracing::info!("Image decoded: {}x{}", img.width(), img.height());
-        
+
         let (width, height) = img.dimensions();
         let target_width = width.min(max_width);
         let target_height = height.min(max_height * 2);
-        
+
         let scale = f32::min(
             target_width as f32 / width as f32,
             target_height as f32 / height as f32,
         );
         let new_w = (width as f32 * scale).round() as u32;
         let new_h = (height as f32 * scale).round() as u32;
-        
+
         let resized = img.resize_exact(new_w, new_h, image::imageops::FilterType::CatmullRom);
         let rgba_img = resized.to_rgba8();
         let (w, h) = rgba_img.dimensions();
-        
+
         let mut lines_data = Vec::new();
-        
+
         for y in (0..h).step_by(2) {
             let mut row = Vec::new();
             for x in 0..w {
@@ -96,25 +114,46 @@ pub async fn fetch_and_render_image_with_client(client: reqwest::Client, url: St
                 } else {
                     &image::Rgba([0, 0, 0, 0])
                 };
-                
+
                 let has_fg = top_pixel[3] > 0;
                 let has_bg = bottom_pixel[3] > 0;
-                
+
                 row.push((
-                    top_pixel[0], top_pixel[1], top_pixel[2],
-                    bottom_pixel[0], bottom_pixel[1], bottom_pixel[2],
-                    has_fg, has_bg
+                    top_pixel[0],
+                    top_pixel[1],
+                    top_pixel[2],
+                    bottom_pixel[0],
+                    bottom_pixel[1],
+                    bottom_pixel[2],
+                    has_fg,
+                    has_bg,
                 ));
             }
             lines_data.push(row);
         }
-        
+
         Ok::<Vec<Vec<(u8, u8, u8, u8, u8, u8, bool, bool)>>, anyhow::Error>(lines_data)
-    }).await??;
+    })
+    .await??;
 
     // Save to disk cache
     if let Ok(json) = serde_json::to_string(&lines_to_cache) {
-        let _ = tokio::fs::write(&cache_path, json).await;
+        match tokio::fs::create_dir_all(&cache_dir).await {
+            Ok(()) => {
+                if let Err(err) = tokio::fs::write(&cache_path, json).await {
+                    tracing::debug!(
+                        "Failed to write image cache {}: {err}",
+                        cache_path.display()
+                    );
+                }
+            }
+            Err(err) => {
+                tracing::debug!(
+                    "Failed to create image cache directory {}: {err}",
+                    cache_dir.display()
+                );
+            }
+        }
     }
 
     // Convert to ratatui lines for return

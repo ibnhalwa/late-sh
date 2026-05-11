@@ -31,11 +31,12 @@ impl App {
         if let Some(b) = self.chat.tick() {
             self.banner = Some(b);
         }
-        // Poll résultat upload image
+        // Poll image upload results.
         if let Some(result) = self.chat.poll_image_upload() {
+            let target_room_id = self.chat.take_image_upload_target_room_id();
             match result {
                 Ok(url) => {
-                    if let Some(room_id) = self.chat.selected_room_id {
+                    if let Some(room_id) = target_room_id.or(self.chat.selected_room_id) {
                         self.chat.start_composing_in_room(room_id);
                         self.chat.composer_push_str(&url);
                     }
@@ -44,8 +45,7 @@ impl App {
                     ));
                 }
                 Err(msg) => {
-                    self.banner =
-                        Some(crate::app::common::primitives::Banner::error(&msg));
+                    self.banner = Some(crate::app::common::primitives::Banner::error(&msg));
                 }
             }
         }
